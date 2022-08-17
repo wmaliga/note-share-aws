@@ -1,41 +1,155 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  note-share-aws
+Description: Note Share Project
 
-  Sample SAM Template for note-share-aws
+# More info about Parameters: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: "'*'"
+    EndpointConfiguration:
+      Type: REGIONAL
+    TracingEnabled: true
   Function:
-    Timeout: 3
+    Runtime: python3.9
+    Timeout: 10
 
 Resources:
-  HelloWorldFunction:
+  RestApi:
+    Type: AWS::Serverless::Api
+    Description: Note Share API
+    Properties:
+      StageName: !Ref Stage
+      OpenApiVersion: 3.0.1 # Fix issue with extra stage
+
+  NotesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'NotesTable-${Stage}'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  FindPublicNotesFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello_world/
-      Handler: app.lambda_handler
-      Runtime: python3.9
-      Architectures:
-        - x86_64
+      FunctionName: !Sub '${AWS::StackName}-FindPublicNotes-${Stage}'
+      Description: Returns public notes.
+      CodeUri: find_public_notes/
+      Handler: app.find_public_notes
+      Tracing: Active
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Sub 'NotesTable-${Stage}'
+      Environment:
+        Variables:
+          TABLE_NAME: !Sub 'NotesTable-${Stage}'
       Events:
-        HelloWorld:
+        FindPublicNotesEvent:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /hello
+            Path: /notes
             Method: get
+            RestApiId: !Ref RestApi
+
+  GetNoteTypeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-GetNoteType-${Stage}'
+      Description: Returns type of the note.
+      CodeUri: get_note_type/
+      Handler: app.get_note_type
+      Tracing: Active
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Sub 'NotesTable-${Stage}'
+      Environment:
+        Variables:
+          TABLE_NAME: !Sub 'NotesTable-${Stage}'
+      Events:
+        GetNoteTypeEvent:
+          Type: Api
+          Properties:
+            Path: /notes/{id}/type
+            Method: get
+            RestApiId: !Ref RestApi
+
+  GetNoteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-GetNote-${Stage}'
+      Description: Returns note data.
+      CodeUri: get_note/
+      Handler: app.get_note
+      Tracing: Active
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Sub 'NotesTable-${Stage}'
+      Environment:
+        Variables:
+          TABLE_NAME: !Sub 'NotesTable-${Stage}'
+      Events:
+        GetNoteEvent:
+          Type: Api
+          Properties:
+            Path: /notes/{id}
+            Method: get
+            RestApiId: !Ref RestApi
+
+  SaveNoteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-SaveNote-${Stage}'
+      Description: Save new note.
+      CodeUri: save_note/
+      Handler: app.save_note
+      Tracing: Active
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Sub 'NotesTable-${Stage}'
+      Environment:
+        Variables:
+          TABLE_NAME: !Sub 'NotesTable-${Stage}'
+      Events:
+        SaveNoteEvent:
+          Type: Api
+          Properties:
+            Path: /notes
+            Method: post
+            RestApiId: !Ref RestApi
+
+  TestDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-TestData-${Stage}'
+      Description: Load test data.
+      CodeUri: test_data/
+      Handler: app.test_data
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Sub 'NotesTable-${Stage}'
+      Environment:
+        Variables:
+          TABLE_NAME: !Sub 'NotesTable-${Stage}'
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  RestApi:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${RestApi.Stage}"
