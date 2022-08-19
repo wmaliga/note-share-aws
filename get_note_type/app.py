@@ -1,43 +1,14 @@
-import json
-import os
-
-import boto3
-
-table_name = os.environ['TABLE_NAME']
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(table_name)
+import database
+import response
 
 
 def get_note_type(event, context):
     note_id = event['pathParameters']['id']
     print(f'Get note type id = {note_id}')
 
-    data = table.get_item(
-        Key={'id': note_id},
-        AttributesToGet=['type']
-    )
+    note = database.get_note_type(note_id)
 
-    if 'Item' not in data:
-        return error(404, 'Note not found')
+    if not note:
+        return response.error(404, 'Note not found')
 
-    return success(data['Item']['type'])
-
-
-def success(body):
-    return {
-        'statusCode': 200,
-        'headers': {
-            'Access-Control-Allow-Origin': '*'
-        },
-        'body': json.dumps(body)
-    }
-
-
-def error(code, message):
-    return {
-        'statusCode': code,
-        'headers': {
-            'Access-Control-Allow-Origin': '*'
-        },
-        'body': f'{code}: {message}'
-    }
+    return response.success(note['type'])

@@ -47,6 +47,18 @@ Resources:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
 
+  ResponseLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub '${AWS::StackName}-Repository-${Stage}'
+      ContentUri: layers/response/
+
+  DatabaseLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub '${AWS::StackName}-Database-${Stage}'
+      ContentUri: layers/database/
+
   FindPublicNotesFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -55,6 +67,9 @@ Resources:
       CodeUri: find_public_notes/
       Handler: app.find_public_notes
       Tracing: Active
+      Layers:
+        - !Ref DatabaseLayer
+        - !Ref ResponseLayer
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Sub 'NotesTable-${Stage}'
@@ -77,6 +92,9 @@ Resources:
       CodeUri: get_note_type/
       Handler: app.get_note_type
       Tracing: Active
+      Layers:
+        - !Ref DatabaseLayer
+        - !Ref ResponseLayer
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Sub 'NotesTable-${Stage}'
@@ -99,6 +117,9 @@ Resources:
       CodeUri: get_note/
       Handler: app.get_note
       Tracing: Active
+      Layers:
+        - !Ref DatabaseLayer
+        - !Ref ResponseLayer
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Sub 'NotesTable-${Stage}'
@@ -121,6 +142,9 @@ Resources:
       CodeUri: save_note/
       Handler: app.save_note
       Tracing: Active
+      Layers:
+        - !Ref DatabaseLayer
+        - !Ref ResponseLayer
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Sub 'NotesTable-${Stage}'
@@ -142,6 +166,8 @@ Resources:
       Description: Load test data.
       CodeUri: test_data/
       Handler: app.test_data
+      Layers:
+        - !Ref DatabaseLayer
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Sub 'NotesTable-${Stage}'

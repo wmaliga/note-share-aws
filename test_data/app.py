@@ -1,10 +1,4 @@
-import os
-
-import boto3
-
-table_name = os.environ['TABLE_NAME']
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(table_name)
+import database
 
 testNote1 = {
     'id': '4c79575f-4a6a-4901-8d42-7650edb72c10',
@@ -208,4 +202,4 @@ def test_data(event, context):
 
 def load(note):
     print(f"Loading note: {note['title']} [{note['id']}]")
-    table.put_item(Item=note)
+    database.save_note(note)
